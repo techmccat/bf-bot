@@ -8,6 +8,7 @@ use std::{collections::HashMap, sync::Mutex};
 pub struct Handler {
     user_lock: Mutex<HashMap<u64, Mutex<HashMap<u64, String>>>>,
 }
+
 impl Handler {
     pub fn new() -> Handler {
         Handler {
@@ -34,6 +35,7 @@ impl Handler {
         }
     }
 }
+
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
@@ -73,13 +75,14 @@ impl EventHandler for Handler {
                             .channel_id
                             .say(
                                 &ctx.http,
-                                "Program requires input, next message from user will be read",
+                                format!("Program requires input, next message from {} will be read", msg.author.name),
                             )
                             .await
                         {
                             println!("Error sending message: {:?}", err);
                         }
                     } else {
+                        let typing = msg.channel_id.start_typing(&ctx.http).unwrap();
                         if let Err(err) = msg
                             .channel_id
                             .say(
@@ -93,11 +96,13 @@ impl EventHandler for Handler {
                         {
                             println!("Error sending message: {:?}", err);
                         }
+                        typing.stop();
                     }
                 }
             }
         }
     }
+
     async fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
     }
