@@ -6,7 +6,12 @@ use serenity::{
 use std::{collections::HashMap, sync::Mutex};
 
 pub struct Handler {
-    user_lock: Mutex<HashMap<u64, Mutex<HashMap<u64, String>>>>,
+    user_lock: Mutex<HashMap<u64, Mutex<HashMap<u64, MapData>>>>,
+}
+
+struct MapData {
+    text: String,
+    botmsg: Message,
 }
 
 impl Handler {
@@ -15,20 +20,28 @@ impl Handler {
             user_lock: Mutex::new(HashMap::new()),
         }
     }
-    fn add_to_map(
-        &self,
-        chid: u64,
-        uid: u64,
-        content: String,
-    ) {
+    fn add_to_map(&self, chid: u64, uid: u64, content: String, botmsg: Message) {
         let mut channels = self.user_lock.lock().unwrap();
         if let Some(mutex) = channels.get(&chid) {
-            mutex.lock().unwrap().insert(uid, content);
+            mutex.lock().unwrap().insert(
+                uid,
+                MapData {
+                    text: content,
+                    botmsg,
+                },
+            );
         } else {
             channels.insert(
                 chid,
                 Mutex::new({
-                    let map: HashMap<u64, String> = [(uid, content)].iter().cloned().collect();
+                    let mut map = HashMap::new();
+                    map.insert(
+                        uid,
+                        MapData {
+                            text: content,
+                            botmsg,
+                        },
+                    );
                     map
                 }),
             );
@@ -39,7 +52,7 @@ impl Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-        let prog = if let Some(c) = self.user_lock.lock().unwrap().get(&msg.channel_id.0) {
+        let mapdata = if let Some(c) = self.user_lock.lock().unwrap().get(&msg.channel_id.0) {
             if let Some(m) = c.lock().unwrap().remove(&msg.author.id.0) {
                 Some(m)
             } else {
@@ -48,12 +61,12 @@ impl EventHandler for Handler {
         } else {
             None
         };
-        if let Some(text) = prog {
+        if let Some(d) = mapdata {
             if let Err(err) = msg
                 .channel_id
                 .say(
                     &ctx.http,
-                    match bf_lib::run(&text[2..], Some(msg.content)) {
+                    match bf_lib::run(&d.text[2..], Some(msg.content)) {
                         Ok(ok) => ok,
                         Err(err) => err,
                     },
@@ -62,24 +75,35 @@ impl EventHandler for Handler {
             {
                 println!("Error sending message: {:?}", err);
             }
+            if let Err(err) = d
+                .botmsg
+                    .delete(&ctx.http)
+                    .await {
+                println!("Error deleting message: {:?}", err);
+            }
         } else {
             if msg.content.len() > 2 {
                 if msg.content[..2] == *"< " {
                     if bf_lib::wants_input(&msg.content[..]) {
-                        self.add_to_map(
-                            msg.channel_id.0,
-                            msg.author.id.0,
-                            msg.content,
-                        );
-                        if let Err(err) = msg
+                        let botmsg = match msg
                             .channel_id
                             .say(
                                 &ctx.http,
-                                format!("Program requires input, next message from {} will be read", msg.author.name),
+                                format!(
+                                    "Program requires input, next message from {} will be read",
+                                    msg.author.name
+                                ),
                             )
                             .await
                         {
-                            println!("Error sending message: {:?}", err);
+                            Ok(msg) => Some(msg),
+                            Err(err) => {
+                                println!("Error sending message: {:?}", err);
+                                None
+                            }
+                        };
+                        if let Some(bm) = botmsg {
+                            self.add_to_map(msg.channel_id.0, msg.author.id.0, msg.content, bm);
                         }
                     } else {
                         let typing = msg.channel_id.start_typing(&ctx.http).unwrap();
