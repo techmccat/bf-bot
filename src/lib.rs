@@ -14,6 +14,25 @@ impl Handler {
             user_lock: Mutex::new(HashMap::new()),
         }
     }
+    fn add_to_map(
+        &self,
+        chid: u64,
+        uid: u64,
+        content: String,
+    ) {
+        let mut channels = self.user_lock.lock().unwrap();
+        if let Some(mutex) = channels.get(&chid) {
+            mutex.lock().unwrap().insert(uid, content);
+        } else {
+            channels.insert(
+                chid,
+                Mutex::new({
+                    let map: HashMap<u64, String> = [(uid, content)].iter().cloned().collect();
+                    map
+                }),
+            );
+        }
+    }
 }
 #[async_trait]
 impl EventHandler for Handler {
@@ -45,8 +64,7 @@ impl EventHandler for Handler {
             if msg.content.len() > 2 {
                 if msg.content[..2] == *"< " {
                     if bf_lib::wants_input(&msg.content[..]) {
-                        add_to_map(
-                            &self.user_lock,
+                        self.add_to_map(
                             msg.channel_id.0,
                             msg.author.id.0,
                             msg.content,
@@ -82,25 +100,5 @@ impl EventHandler for Handler {
     }
     async fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
-    }
-}
-
-fn add_to_map(
-    user_lock: &Mutex<HashMap<u64, Mutex<HashMap<u64, String>>>>,
-    chid: u64,
-    uid: u64,
-    content: String,
-) {
-    let mut channels = user_lock.lock().unwrap();
-    if let Some(mutex) = channels.get(&chid) {
-        mutex.lock().unwrap().insert(uid, content);
-    } else {
-        channels.insert(
-            chid,
-            Mutex::new({
-                let map: HashMap<u64, String> = [(uid, content)].iter().cloned().collect();
-                map
-            }),
-        );
     }
 }
