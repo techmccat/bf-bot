@@ -1,6 +1,6 @@
 use serenity::{
     async_trait,
-    model::{channel::Message, gateway::Ready},
+    model::{channel::Message, error::Error, gateway::Ready},
     prelude::*,
 };
 use std::{collections::HashMap, sync::Mutex};
@@ -66,16 +66,22 @@ impl EventHandler for Handler {
         let mapdata = self.get_user_lock(msg.channel_id.0, msg.author.id.0);
         let prog = if let Some(d) = mapdata.clone() {
             Some(d.text)
-        } else {
-            if msg.content.len() > 2 {
-                if msg.content[..2] == *"< " {
-                    Some(String::from(&msg.content[2..]))
-                } else {
-                    None
-                }
+        } else if msg.content.len() > 2 {
+            if msg.content[..2] == *"< " {
+                Some(String::from(&msg.content[2..]))
             } else {
                 None
             }
+        } else if msg.content == "<" && msg.attachments.len() > 0 {
+            match msg.attachments[0].download().await {
+                Ok(chars) => Some(String::from_utf8_lossy(&chars).into_owned()),
+                Err(err) => {
+                    println!("Error downloading attachment: {:?}", err);
+                    None
+                }
+            }
+        } else {
+            None
         };
         let input = if let Some(d) = mapdata {
             if let Err(err) = d.botmsg.delete(&ctx.http).await {
@@ -113,9 +119,21 @@ impl EventHandler for Handler {
             None
         };
         if let Some(o) = output {
-            if let Err(err) = msg.channel_id.say(&ctx.http, o).await {
-                println!("Error sending message: {:?}", err);
-            }
+            if let Err(e) = msg.channel_id.say(&ctx.http, &o).await {
+                if let serenity::Error::Model(Error::MessageTooLong(_)) = e {
+                    if let Err(e) = msg
+                        .channel_id
+                        .send_files(&ctx.http, vec![(o.as_bytes(), "output.txt")], |m| {
+                            m.content("Program output was too long, sending as file")
+                        })
+                        .await
+                    {
+                        println!("Error sending message: {}", e)
+                    }
+                } else {
+                    println!("Error sending message: {}", e)
+                }
+            };
         }
     }
 
