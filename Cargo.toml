@@ -3,10 +3,13 @@ name = "bf-bot"
 version = "0.1.0"
 authors = ["techmccat <alessioa02004@gmail.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "A discord bot to run brainfuck code"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/techmccat/bf-bot"
+keywords = ["brainfuck", "discord"]
 
 [dependencies]
-bf-lib = { path = "../bf-lib" }
+bf-lib = "0.1.0"
 serenity = { version = "0.9.0", default-features = false, features = ["client", "gateway", "rustls_backend", "model"] }
 tokio = { version = "0.2", features = ["macros"] }
