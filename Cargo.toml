@@ -1,6 +1,6 @@
 [package]
 name = "bf-bot"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["techmccat <alessioa02004@gmail.com>"]
 edition = "2018"
 description = "A discord bot to run brainfuck code"
