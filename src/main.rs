@@ -1,16 +1,22 @@
+use bf_bot::{Config, Handler} ;
 use serenity::prelude::*;
-use std::{env, fs};
+use std::{env, fs, time::Duration};
 use toml::Value;
 
 #[tokio::main]
 async fn main() {
-    let config = read_config().parse::<Value>().unwrap();
-    let token = match config["token"].as_str() {
+    let toml = read_config().parse::<Value>().unwrap();
+    let token = match toml["token"].as_str() {
         Some(t) => t.to_owned(),
         None => env::var("DISCORD_TOKEN").expect("No token provided"),
     };
-    let prefix = config["prefix"].as_str().expect("No prefix provided");
-    let handler = bf_bot::Handler::new(prefix.to_owned());
+    let config = Config {
+        prefix: toml["prefix"].as_str().expect("No prefix provided").to_string(),
+        timeout: if let Some(s) = toml["timeout"].as_str() { Some(Duration::from_secs(s.parse().unwrap())) } else { None },
+        tmppath: if let Some(s) = toml.get("tmppath") { let mut p = env::current_dir().unwrap();
+            p.push(s.to_string()); Some(p) } else { None }
+    };
+    let handler = Handler::new(config);
     let mut client = Client::builder(&token)
         .event_handler(handler)
         .await

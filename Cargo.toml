@@ -10,7 +10,7 @@ repository = "https://github.com/techmccat/bf-bot"
 keywords = ["brainfuck", "discord"]
 
 [dependencies]
-bf-lib = "0.1.1"
+bf-lib = "0.2"
 serenity = { version = "0.9.0", default-features = false, features = ["client", "gateway", "rustls_backend", "model"] }
 tokio = "0.2"
 toml = "0.5"

@@ -8,7 +8,13 @@ use tokio::task;
 
 pub struct Handler {
     user_lock: Mutex<HashMap<u64, HashMap<u64, MapData>>>,
-    prefix: String,
+    config: Config
+}
+
+pub struct Config {
+    pub prefix: String,
+    pub timeout: Option<std::time::Duration>,
+    pub tmppath: Option<std::path::PathBuf>
 }
 
 #[derive(Clone)]
@@ -18,10 +24,10 @@ struct MapData {
 }
 
 impl Handler {
-    pub fn new(prefix: String) -> Handler {
+    pub fn new(config: Config) -> Handler {
         Handler {
             user_lock: Mutex::new(HashMap::new()),
-            prefix,
+            config
         }
     }
 
@@ -67,16 +73,17 @@ impl Handler {
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         let mapdata = self.get_user_lock(msg.channel_id.0, msg.author.id.0);
-        let pl = self.prefix.len();
+        let pl = self.config.prefix.len();
+        let timeout = self.config.timeout;
         let prog = if let Some(d) = mapdata.clone() {
             Some(d.text)
         } else if msg.content.len() > pl + 1 {
-            if msg.content[..pl + 1] == format!("{} ", self.prefix) {
+            if msg.content[..pl + 1] == format!("{} ", self.config.prefix) {
                 Some(String::from(&msg.content[2..]))
             } else {
                 None
             }
-        } else if msg.content == self.prefix && msg.attachments.len() > 0 {
+        } else if msg.content == self.config.prefix && msg.attachments.len() > 0 {
             match msg.attachments[0].download().await {
                 Ok(chars) => Some(String::from_utf8_lossy(&chars).into_owned()),
                 Err(err) => {
@@ -111,11 +118,12 @@ impl EventHandler for Handler {
                 self.add_to_map(msg.channel_id.0, msg.author.id.0, prog, botmsg);
                 None
             } else {
-                let join = task::spawn_blocking(move || bf_lib::run_timeout(&prog, input, 360));
+                //let join = task::spawn_blocking(move || bf_lib::Exec::prog(&prog).input(input).timeout(self.config.timeout.clone()).run());
+                let join = task::spawn_blocking(move || bf_lib::Exec::prog(&prog).input(input).timeout(timeout).run());
                 let typing = msg.channel_id.start_typing(&ctx.http).unwrap();
                 let o = match join.await.unwrap() {
                     Ok(ok) => ok,
-                    Err(err) => err,
+                    Err(err) => err.to_string(),
                 };
                 typing.stop();
                 Some(o)

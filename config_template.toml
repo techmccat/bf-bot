@@ -1,2 +1,5 @@
 token = ""
 prefix = "<"
+# timeout in seconds
+timeout = "120"
+tmp_path = tmp
