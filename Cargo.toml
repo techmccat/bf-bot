@@ -1,6 +1,6 @@
 [package]
 name = "bf-bot"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["techmccat <alessioa02004@gmail.com>"]
 edition = "2018"
 description = "A discord bot to run brainfuck code"
@@ -11,6 +11,7 @@ keywords = ["brainfuck", "discord"]
 
 [dependencies]
 bf-lib = "0.2"
+serde = "1.0"
 serenity = { version = "0.9.0", default-features = false, features = ["client", "gateway", "rustls_backend", "model"] }
 tokio = "0.2"
 toml = "0.5"

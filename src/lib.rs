@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use serenity::{
     async_trait,
     model::{channel::Message, error::Error, gateway::Ready},
@@ -11,10 +12,13 @@ pub struct Handler {
     config: Config
 }
 
+#[derive(Clone, Deserialize)]
 pub struct Config {
+    pub token: String,
     pub prefix: String,
     pub timeout: Option<std::time::Duration>,
-    pub tmppath: Option<std::path::PathBuf>
+    pub tmppath: Option<std::path::PathBuf>,
+    pub transpile: bool
 }
 
 #[derive(Clone)]
@@ -73,6 +77,7 @@ impl Handler {
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         let mapdata = self.get_user_lock(msg.channel_id.0, msg.author.id.0);
+        let transpile = self.config.transpile;
         let pl = self.config.prefix.len();
         let timeout = self.config.timeout;
         let prog = if let Some(d) = mapdata.clone() {
@@ -119,7 +124,13 @@ impl EventHandler for Handler {
                 None
             } else {
                 //let join = task::spawn_blocking(move || bf_lib::Exec::prog(&prog).input(input).timeout(self.config.timeout.clone()).run());
-                let join = task::spawn_blocking(move || bf_lib::Exec::prog(&prog).input(input).timeout(timeout).run());
+                let join = task::spawn_blocking(move || 
+                    {
+                        let exec = bf_lib::Exec::prog(&prog).input(input).timeout(timeout);
+                        if transpile {
+                            exec.run()
+                        } else { exec.interpret() }
+                    });
                 let typing = msg.channel_id.start_typing(&ctx.http).unwrap();
                 let o = match join.await.unwrap() {
                     Ok(ok) => ok,

@@ -2,4 +2,5 @@ token = ""
 prefix = "<"
 # timeout in seconds
 timeout = "120"
+transpile = false
 tmp_path = "tmp"
